@@ -1,5 +1,6 @@
 // imports
 const express = require("express");
+const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
@@ -10,6 +11,8 @@ const {
   verifySchema,
   loginSchema,
   ResendOtpSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } = require("../validation/userValidator");
 const { User } = require("../model/User");
 const { sendMail } = require("../utils/sendEmail");
@@ -209,5 +212,93 @@ router.post("/resend-otp", async function (request, response) {
 // TODO [NOT IMPLEMENTED YET]
 
 // TODO: Forgot Password
+router.post("/forgot-password", async function (requset, response) {
+  try {
+    // Validate Data
+    const { error, value } = forgotPasswordSchema.validate(requset.body);
+
+    if (error) {
+      return response.status(400).json({ message: error.message });
+    }
+
+    // Extract Info
+    const { email } = value;
+
+    // Check User
+    const user = await User.findOne({ email });
+    if (!user) {
+      return response
+        .status(400)
+        .json({ message: "This Email Not Related To User" });
+    }
+
+    // randomBytes Generate 32
+    const resetPasswordToken = crypto.randomBytes(32).toString("hex");
+    const resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+
+    // Update User
+    user.resetPasswordToken = resetPasswordToken;
+    user.resetPasswordExpires = resetPasswordExpires;
+
+    await user.save();
+
+    // Origin Front + reset-password/${token}
+    const resetUrl = `${process.env.CLIENT_ORIGIN}/reset-password/${resetPasswordToken}`;
+
+    await sendMail(
+      email,
+      "Reset Password",
+      `Click this link to reset your password: ${resetUrl}`
+    );
+
+    response.json({ message: "Reset Password Link Sent To Your Mail." });
+  } catch (error) {
+    console.log(error);
+    response.status(500).json({ message: "Internal Server Error!" });
+  }
+});
 // TODO: Reset Password
+router.post("/reset-password", async function (requset, response) {
+  try {
+    // Validate Data
+    const { error, value } = resetPasswordSchema.validate(requset.body, {
+      abortEarly: false,
+    });
+
+    if (error) {
+      return response
+        .status(400)
+        .json({ messages: error.details.map((e) => e.message) });
+    }
+    // Extract Info
+    const { token, newPassword } = value;
+
+    // Check User Exist
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return response.status(400).json({ message: "Invalid Token Or Expired" });
+    }
+
+    // Hash
+    const password = await bcrypt.hash(newPassword, 12);
+
+    // Update
+    user.password = password;
+
+    // Clear
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    await user.save();
+
+    response.json({ message: "Password Changes Successfully" });
+  } catch (error) {
+    console.log(error);
+    response.status(500).json({ message: "Internal Server Error!" });
+  }
+});
 module.exports = router;
