@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
+const path = require("path");
 
 const userSchema = new mongoose.Schema({
+  // Authentication Info
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
   role: {
@@ -15,6 +17,14 @@ const userSchema = new mongoose.Schema({
 
   resetPasswordToken: { type: String },
   resetPasswordExpires: { type: Date },
+
+  // Profile Info
+  name: { type: String, required: true },
+  profilePic: {
+    type: String,
+    default: path.join("public", "default-profile-picture.png"),
+  },
+  bio: { type: String, default: "" },
 });
 
 const User = mongoose.model("User", userSchema);

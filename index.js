@@ -1,10 +1,12 @@
 // imports
 const express = require("express");
 const dotenv = require("dotenv");
+const path = require("path");
 const cors = require("cors");
 
 // internal imports
 const authRoutes = require("./routes/authRoutes");
+const usersRoutes = require("./routes/usersRoutes");
 const { connectToDatabase } = require("./config/dbConfig");
 const { default: rateLimit } = require("express-rate-limit");
 
@@ -14,6 +16,10 @@ dotenv.config();
 // App
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Serve Static Files
+app.use("/public", express.static(path.join(__dirname, "public"))); // server -> access default
+app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // user front end access profilePic
 
 // Global Middlewares
 app.use(express.json());
@@ -36,6 +42,7 @@ app.get("/", (request, response) => {
 
 // API Routes
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", usersRoutes);
 
 // Connect Cloud
 connectToDatabase();

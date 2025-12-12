@@ -17,6 +17,7 @@ const {
 const { User } = require("../model/User");
 const { sendMail } = require("../utils/sendEmail");
 const { generateOtp } = require("../utils/generateOTP");
+const { authMiddleware } = require("../middlewares/authMiddleware");
 
 // Global Config
 dotenv.config();
@@ -69,7 +70,16 @@ router.post("/login", async function (request, response) {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
-    response.json({ message: "Loggedin Successfully", token });
+    response.json({
+      message: "Loggedin Successfully",
+      token,
+      user: {
+        id: user._id,
+        role: user.role,
+        email: user.email,
+        name: user.name,
+      },
+    });
   } catch (error) {
     console.log(error);
     response.status(500).json({ message: "Internal Server Error!" });
@@ -90,7 +100,7 @@ router.post("/register", async function (request, response) {
     }
 
     // Extract Info
-    const { email, password } = value;
+    const { email, password, name } = value;
 
     // Validate Email Exist Or Not
     const userExisting = await User.findOne({ email });
@@ -106,6 +116,7 @@ router.post("/register", async function (request, response) {
 
     // Save User
     const user = await User.create({
+      name,
       email,
       password: hashedPassword,
       otp,
@@ -161,7 +172,14 @@ router.post("/verify-otp", async function (request, response) {
     // Save
     await user.save();
 
-    response.json({ message: "Account Verified Successfully" });
+    // Generate Token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    response.json({ message: "Account Verified Successfully", token });
   } catch (error) {
     console.log(error);
     response.status(500).json({ message: "Internal Server Error!" });
@@ -191,6 +209,8 @@ router.post("/resend-otp", async function (request, response) {
       return response.status(400).json({ message: "User Already is Verified" });
     }
 
+    // TODO: Prevent Spam : if otpExpires
+
     // Generate OTP + Expires
     const { otp, otpExpires } = generateOtp();
 
@@ -208,9 +228,6 @@ router.post("/resend-otp", async function (request, response) {
     response.status(500).json({ message: "Internal Server Error!" });
   }
 });
-
-// TODO [NOT IMPLEMENTED YET]
-
 // TODO: Forgot Password
 router.post("/forgot-password", async function (requset, response) {
   try {
@@ -243,12 +260,17 @@ router.post("/forgot-password", async function (requset, response) {
     await user.save();
 
     // Origin Front + reset-password/${token}
-    const resetUrl = `${process.env.CLIENT_ORIGIN}/reset-password/${resetPasswordToken}`;
+    const baseUrl = JSON.parse(process.env.PRODUCTION_ENV)
+      ? process.env.CLIENT_ORIGIN
+      : "http://localhost:5173";
+
+    const resetUrl = `${baseUrl}/reset-password/${resetPasswordToken}`;
 
     await sendMail(
       email,
       "Reset Password",
-      `Click this link to reset your password: ${resetUrl}`
+      `Hello ${user.email},`,
+      `<p>Click this link to reset your password: <a href="${resetUrl}" target="_blank">Click ME</a></p>`
     );
 
     response.json({ message: "Reset Password Link Sent To Your Mail." });
@@ -296,6 +318,25 @@ router.post("/reset-password", async function (requset, response) {
     await user.save();
 
     response.json({ message: "Password Changes Successfully" });
+  } catch (error) {
+    console.log(error);
+    response.status(500).json({ message: "Internal Server Error!" });
+  }
+});
+// TODO: Me Get User Info
+router.get("/me", authMiddleware, async function (request, response) {
+  try {
+    // Extract Info
+    const id = request.user.id;
+
+    // Validate User
+    const user = await User.findById(id, { password: 0 });
+    if (!user) {
+      return response.status(400).json({ message: "User Not Found" });
+    }
+
+    // Send Response
+    response.json(user);
   } catch (error) {
     console.log(error);
     response.status(500).json({ message: "Internal Server Error!" });
