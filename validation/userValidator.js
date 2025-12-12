@@ -28,6 +28,11 @@ const verifySchema = Joi.object({
   otp: Joi.string().length(6).required(),
 });
 
+const updateProfileSchema = Joi.object({
+  name: Joi.string().min(3).optional(),
+  bio: Joi.string().optional(),
+});
+
 module.exports = {
   registerSchema,
   verifySchema,
@@ -35,4 +40,5 @@ module.exports = {
   ResendOtpSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  updateProfileSchema,
 };
