@@ -8,6 +8,7 @@ const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
 const usersRoutes = require("./routes/usersRoutes");
 const postsRoutes = require("./routes/postsRoutes");
+const commentsRoutes = require("./routes/commentsRoutes");
 const { connectToDatabase } = require("./config/dbConfig");
 const { default: rateLimit } = require("express-rate-limit");
 
@@ -45,6 +46,7 @@ app.get("/", (request, response) => {
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", usersRoutes);
 app.use("/api/v1/posts", postsRoutes);
+app.use("/api/v1/comments", commentsRoutes);
 
 // Connect Cloud
 connectToDatabase();

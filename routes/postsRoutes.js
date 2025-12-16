@@ -2,6 +2,7 @@ const express = require("express");
 const { authMiddleware } = require("../middlewares/authMiddleware");
 const { upload } = require("../utils/upload");
 const { Post } = require("../model/Post");
+const { Comment } = require("../model/Comment");
 
 const router = express.Router();
 
@@ -47,7 +48,7 @@ router.put("/:id/like", authMiddleware, async function (request, response) {
   try {
     // Get Post
     const id = request.params.id;
-    const post = await Post.findById(id);
+    const post = await Post.findById(id).populate("userId", "name profilePic");
 
     if (!post) return response.status(404).json({ message: "Post Not Found!" });
 
@@ -67,6 +68,24 @@ router.put("/:id/like", authMiddleware, async function (request, response) {
     await post.save();
 
     response.json({ post, likes: post.likes.length });
+  } catch (error) {
+    console.log(error);
+    response.status(500).json({ message: "Internal Server Error!" });
+  }
+});
+
+// Get All Comments Per Post
+router.get("/:id/comments", async function (request, response) {
+  try {
+    // Get Post Id
+    const id = request.params.id;
+
+    // Latest Comments Per Post
+    const comments = await Comment.find({ postId: id })
+      .populate("userId", "name profilePic")
+      .sort({ createdAt: -1 });
+
+    response.json({ message: "Comments Fetched Successfully", comments });
   } catch (error) {
     console.log(error);
     response.status(500).json({ message: "Internal Server Error!" });
